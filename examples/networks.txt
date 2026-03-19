@@ -1,0 +1,6 @@
+# Reti da scansionare (una per riga)
+# Formato: CIDR notation
+#
+# Esempio: scansiona subnet piccole per test rapido
+8.8.8.0/29
+1.1.1.0/30

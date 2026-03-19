@@ -1,0 +1,21 @@
+Name,State,Host,Provisioned Space,IP Address,Source
+SRV-WEB01,Powered On,esxi-node01.lab,120 GB,"8.8.8.8, fe80::1",vmware
+SRV-DB01,Powered On,esxi-node02.lab,250 GB,1.1.1.1,vmware
+SRV-MAIL,Powered On,esxi-node01.lab,80 GB,"9.9.9.9, fe80::2",vmware
+SRV-DNS,Powered On,esxi-node03.lab,60 GB,208.67.222.222,vmware
+SRV-PROXY,Powered On,esxi-node02.lab,100 GB,208.67.220.220,vmware
+SRV-BACKUP,Powered On,esxi-node03.lab,500 GB,"1.0.0.1, fe80::3",vmware
+SRV-MON,Powered On,esxi-node01.lab,90 GB,8.8.4.4,vmware
+SRV-VPN,Powered On,esxi-node02.lab,40 GB,4.2.2.1,vmware
+SRV-FILE,Powered On,esxi-node03.lab,1 TB,4.2.2.2,vmware
+SRV-APP01,Powered On,esxi-node01.lab,200 GB,198.41.0.4,vmware
+SRV-APP02,Powered On,esxi-node02.lab,200 GB,192.33.4.12,vmware
+SRV-LDAP,Powered On,esxi-node03.lab,80 GB,199.7.83.42,vmware
+SRV-TEST01,Powered Off,esxi-node01.lab,50 GB,10.0.0.99,vmware
+SRV-DEV,Powered On,esxi-node01.lab,150 GB,,vmware
+SRV-LOG,Powered On,esxi-node02.lab,300 GB,198.97.190.53,vmware
+SRV-CACHE,Powered On,esxi-node03.lab,60 GB,192.5.5.241,vmware
+SRV-GW,Powered On,esxi-node01.lab,30 GB,192.112.36.4,vmware
+SRV-NTP,Powered On,esxi-node02.lab,20 GB,192.36.148.17,vmware
+SRV-SCAN,Powered On,esxi-node03.lab,40 GB,192.58.128.30,vmware
+SRV-REPO,Powered On,esxi-node01.lab,400 GB,193.0.14.129,vmware
