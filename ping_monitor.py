@@ -45,7 +45,6 @@ try:
     from rich.text import Text
     from rich.panel import Panel
     from rich.layout import Layout
-    from rich.rule import Rule
     from rich import box
     HAS_RICH = True
 except ImportError:
@@ -432,7 +431,9 @@ class KeyReader:
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
-            tty.setraw(fd)
+            # setcbreak: toglie buffering input ma lascia intatto l'output
+            # (a differenza di setraw che rompe le sequenze ANSI di Rich)
+            tty.setcbreak(fd)
             while not self._stop.is_set():
                 if select.select([sys.stdin], [], [], 0.05)[0]:
                     ch = sys.stdin.read(1)
@@ -454,8 +455,11 @@ class KeyReader:
                                 self.scroll_offset = 0
                             elif code == "F":    # End
                                 self.scroll_offset = self.max_offset
-                    elif ch == "q":
-                        # 'q' per uscire
+                    elif ch == "u":   # scroll su 10
+                        self.scroll_offset = max(0, self.scroll_offset - 10)
+                    elif ch == "d":   # scroll giu 10
+                        self.scroll_offset = min(self.max_offset, self.scroll_offset + 10)
+                    elif ch in ("q", "x"):
                         os.kill(os.getpid(), 2)  # SIGINT
                         break
         except Exception:
@@ -483,39 +487,25 @@ def make_header(states: list, cycle: int, interval: int, next_in: int) -> Panel:
     bar.append("░" * pend_cells, style="dim")
 
     t = Text()
-    t.append("  GAMO VM Ping Monitor  ", style="bold cyan")
+    t.append("  IP Monitor  ", style="bold cyan")
     t.append(f"ciclo #{cycle}  ", style="yellow")
     t.append(f"▲ {up} UP  ",  style="bold green")
     t.append(f"▼ {down} DOWN  ", style="bold red")
-    t.append(f"{pend} pend  │  ", style="dim")
+    if pend:
+        t.append(f"{pend} pend  │  ", style="dim")
+    else:
+        t.append("│  ", style="dim")
     t.append(bar)
-    t.append(f"  │  next {next_in}s  │  {datetime.now().strftime('%H:%M:%S')}  ",
+    t.append(f"  │  next {next_in}s  │  {datetime.now().strftime('%H:%M:%S')}",
              style="dim")
-    t.append(f"interval={interval}s", style="dim")
 
     return Panel(t, box=box.HORIZONTALS, style="on grey7", padding=(0, 0))
 
 
 def make_vm_table(states: list, term_height: int,
-                  scroll_offset: int = 0, key_reader: "KeyReader | None" = None) -> Panel:
-    """Tabella VM con scroll via tastiera. DOWN sempre in cima."""
+                  key_reader: "KeyReader | None" = None) -> Panel:
+    """Tabella VM con scroll via KeyReader. DOWN sempre in cima."""
     avail_rows = max(5, term_height - CHANGES_PANEL_H - 3 - 5)
-
-    def sort_key(s):
-        if s.up is False: return (0, s.name)
-        if s.up is None:  return (1, s.name)
-        return (2, s.name)
-
-    sorted_states = sorted(states, key=sort_key)
-    total = len(sorted_states)
-
-    # aggiorna limiti scroll nel key_reader
-    if key_reader:
-        key_reader.set_max(total, avail_rows)
-        scroll_offset = key_reader.scroll_offset
-
-    end = min(scroll_offset + avail_rows, total)
-    shown = sorted_states[scroll_offset:end]
 
     tbl = Table(
         box=box.SIMPLE_HEAVY,
@@ -525,25 +515,42 @@ def make_vm_table(states: list, term_height: int,
         padding=(0, 1),
         show_edge=False,
     )
-    tbl.add_column("#",       style="dim",    no_wrap=True, min_width=4, justify="right")
-    tbl.add_column("VM",      style="cyan",   no_wrap=True, min_width=22)
-    tbl.add_column("IP",      style="yellow", no_wrap=True, min_width=16)
-    tbl.add_column("Host",    style="dim",    no_wrap=True, min_width=13)
-    tbl.add_column("Stato",   justify="center", min_width=9)
-    tbl.add_column("Latenza", justify="right",  min_width=9)
-    tbl.add_column("Streak",  justify="center", min_width=7)
-    tbl.add_column("Ult. OK",                   min_width=10)
-    tbl.add_column("Chg",     justify="right",  min_width=4)
+    tbl.add_column("VM",      style="cyan",   no_wrap=True, max_width=28)
+    tbl.add_column("IP",      style="yellow", no_wrap=True, max_width=18)
+    tbl.add_column("Stato",   justify="center", no_wrap=True, width=8)
+    tbl.add_column("Latenza", justify="right",  no_wrap=True, width=9)
+    tbl.add_column("Streak",  justify="center", no_wrap=True, width=6)
+    tbl.add_column("Ult. OK", no_wrap=True, width=9)
 
-    for idx, s in enumerate(shown, start=scroll_offset + 1):
+    def sort_key(s):
+        if s.up is False: return (0, s.name)
+        if s.up is None:  return (1, s.name)
+        return (2, s.name)
+
+    sorted_states = sorted(states, key=sort_key)
+    total = len(sorted_states)
+
+    if key_reader:
+        key_reader.set_max(total, avail_rows)
+        scroll_offset = key_reader.scroll_offset
+    else:
+        scroll_offset = 0
+
+    end = min(scroll_offset + avail_rows, total)
+    shown = sorted_states[scroll_offset:end]
+
+    for s in shown:
         if s.fallback:
-            ip_txt = Text(); ip_txt.append(s.ip, style="yellow"); ip_txt.append(" (fb)", style="dim")
+            ip_txt = Text()
+            ip_txt.append(s.ip, style="yellow")
+            ip_txt.append(" fb", style="dim")
         else:
             ip_txt = Text(s.ip, style="yellow")
 
         if s.up is True:
             stato = Text("● UP",   style="bold green")
-            lat   = Text(f"{s.latency:.1f} ms" if s.latency >= 0 else "—", style="green")
+            lat   = Text(f"{s.latency:.1f} ms" if s.latency >= 0 else "—",
+                         style="green")
             strk  = Text(f"↑{s.streak}", style="green")
             rst   = ""
         elif s.up is False:
@@ -558,36 +565,34 @@ def make_vm_table(states: list, term_height: int,
             rst   = ""
 
         last_ok = s.last_ok.strftime("%H:%M:%S") if s.last_ok else "—"
-        chg     = (Text(str(s.changes), style="bold yellow")
-                   if s.changes > 0 else Text("—", style="dim"))
 
-        tbl.add_row(str(idx), s.name[:24], ip_txt, s.host[:13],
-                    stato, lat, strk, last_ok, chg,
-                    style=rst)
+        tbl.add_row(s.name, ip_txt, stato, lat, strk, last_ok, style=rst)
 
-    # indicatore scroll
-    if total <= avail_rows:
-        pos_info = ""
+    if total > avail_rows:
+        pos_info = f"{scroll_offset+1}-{end}/{total}"
     else:
-        pos_info = (f"[dim]  righe {scroll_offset+1}-{end}/{total}"
-                    f"  ↑↓ scroll · PgUp/PgDn · Home/End · q esci[/]")
+        pos_info = f"{total} totali"
+
+    subtitle = f"[dim]↑↓ scroll · u/d pagina · q=esci  │  {pos_info}[/]"
 
     return Panel(tbl,
-                 title=f"[dim]VM ({total} totali){pos_info}[/]",
-                 subtitle="[dim]DOWN sempre in cima[/]" if total > avail_rows else "",
+                 title=f"[dim]VM ({total})[/]",
+                 subtitle=subtitle,
                  box=box.ROUNDED,
                  border_style="bright_black",
                  padding=(0, 0))
 
 
 def make_changes_panel(change_log: deque) -> Panel:
-    if not change_log:
+    real_events = [ev for ev in change_log if ev.prev_state is not None]
+
+    if not real_events:
         inner = Text(
-            "  Nessuna modifica ancora — le variazioni UP ↔ DOWN appariranno qui in tempo reale.",
+            "  In attesa di variazioni UP/DOWN…",
             style="dim italic",
         )
         return Panel(inner,
-                     title="[bold yellow]📋  Modifiche[/]",
+                     title="[bold yellow]Modifiche[/]",
                      border_style="yellow dim",
                      padding=(0, 1),
                      height=CHANGES_PANEL_H)
@@ -595,22 +600,18 @@ def make_changes_panel(change_log: deque) -> Panel:
     tbl = Table(box=None, show_header=True,
                 header_style="bold white", expand=True,
                 padding=(0, 1), show_edge=False)
-    tbl.add_column("Orario", style="dim",    min_width=10, no_wrap=True)
-    tbl.add_column("Ciclo",  style="dim",    min_width=5,  no_wrap=True, justify="right")
-    tbl.add_column("VM",     style="cyan",   min_width=22, no_wrap=True)
-    tbl.add_column("IP",     style="yellow", min_width=15, no_wrap=True)
-    tbl.add_column("Evento",               min_width=15, no_wrap=True)
-    tbl.add_column("Durata DOWN",          min_width=13, no_wrap=True)
+    tbl.add_column("Orario", style="dim",    no_wrap=True, width=8)
+    tbl.add_column("VM",     style="cyan",   no_wrap=True, max_width=24)
+    tbl.add_column("IP",     style="yellow", no_wrap=True, width=15)
+    tbl.add_column("Evento",                 no_wrap=True, width=13)
+    tbl.add_column("Durata",                 no_wrap=True, width=11)
 
-    shown_events = list(change_log)[:CHANGES_ROWS]
+    shown_events = real_events[:CHANGES_ROWS]
     for ev in shown_events:
-        if ev.prev_state is None:
-            evento   = Text("INIT",   style="dim")
-            duration = Text("—",      style="dim")
-        elif ev.new_state:
+        if ev.new_state:
             evento = Text("↑ RECOVERED", style="bold green")
             duration = Text("—", style="dim")
-            for old in list(change_log):
+            for old in real_events:
                 if old.ip == ev.ip and old is not ev and not old.new_state:
                     secs = int((ev.ts - old.ts).total_seconds())
                     h, r = divmod(secs, 3600)
@@ -620,22 +621,22 @@ def make_changes_panel(change_log: deque) -> Panel:
                     duration = Text(dur_str, style="green")
                     break
         else:
-            evento   = Text("↓ LOST",     style="bold red")
-            duration = Text("in corso…",  style="red dim italic")
+            evento   = Text("↓ LOST",    style="bold red")
+            duration = Text("in corso…", style="red dim italic")
 
         tbl.add_row(
             ev.ts.strftime("%H:%M:%S"),
-            f"#{ev.cycle}",
-            ev.vm_name[:24],
+            ev.vm_name,
             ev.ip,
             evento,
             duration,
         )
 
-    total = len(change_log)
-    subtitle = f"[dim]ultimi {len(shown_events)} / {total} eventi[/]"
+    total_ev = len(real_events)
+    subtitle = (f"[dim]{len(shown_events)}/{total_ev} eventi[/]"
+                if total_ev > CHANGES_ROWS else "")
     return Panel(tbl,
-                 title="[bold yellow]📋  Modifiche rispetto alla scansione precedente[/]",
+                 title="[bold yellow]Modifiche[/]",
                  subtitle=subtitle,
                  border_style="yellow",
                  padding=(0, 0),
@@ -670,7 +671,8 @@ def run(csv_path: str, interval: int, workers: int, timeout: int):
     states: list = [HostState(v["name"], v["host"], v["ip"], v["fallback"]) for v in vms]
     change_log: deque = deque(maxlen=MAX_CHANGE_LOG)
     cycle = 0
-    console = Console() if HAS_RICH else None
+    term_w = shutil.get_terminal_size((80, 40)).columns
+    console = Console(width=term_w) if HAS_RICH else None
 
     def ping_cycle():
         nonlocal cycle

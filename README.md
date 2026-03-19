@@ -3,17 +3,18 @@
 Monitor ping in tempo reale e scanner di rete — un singolo file Python, zero dipendenze obbligatorie.
 
 ```
-┌─ HEADER ──────────────────────────────────────────────────────┐
-│ ▲ 45 UP  ▼ 3 DOWN  │ ████████████████████░░░ │ next 7s       │
-├─ TABELLA (scroll ↑↓) ────────────────────────────────────────┤
-│ #   VM              IP              Stato   Latenza  Streak  │
-│ 1   SRV-DB01        10.0.1.5        ✖ DOWN  timeout  ↓3      │
-│ 2   SRV-WEB01       10.0.1.10       ● UP    1.2 ms   ↑12     │
-│ ...                                                           │
-├─ MODIFICHE ───────────────────────────────────────────────────┤
-│ 14:32:05  #8  SRV-DB01   10.0.1.5   ↓ LOST     in corso…     │
-│ 14:30:12  #6  SRV-APP02  10.0.2.20  ↑ RECOVERED  2m03s       │
-└───────────────────────────────────────────────────────────────┘
+  IP Monitor  ciclo #4  ▲ 45 UP  ▼ 3 DOWN  │████████████████████░░░│  next 7s  │  14:32:01
+╭─ VM (48) ────────────────────────────────────────────────────────────────────────────────╮
+│ VM                           IP                  Stato    Latenza   Streak   Ult. OK     │
+│━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
+│ SRV-DB01                     10.0.1.5            ✖ DOWN   timeout    ↓3      —           │
+│ SRV-WEB01                    10.0.1.10           ● UP     1.2 ms     ↑12     14:31:58    │
+│ ...                                                                                      │
+╰─────────────── ↑↓ scroll · u/d pagina · q=esci  │  1-40/48 ────────────────────────────╯
+╭─ Modifiche ──────────────────────────────────────────────────────────────────────────────╮
+│ 14:32:05   SRV-DB01          10.0.1.5    ↓ LOST      in corso…                          │
+│ 14:30:12   SRV-APP02         10.0.2.20   ↑ RECOVERED  2m03s                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ## Caratteristiche
@@ -82,12 +83,13 @@ python3 ping_monitor.py --scan 10.0.0.0/24 --monitor
 
 ### Navigazione nell'UI
 
-| Tasto         | Azione                  |
-|---------------|-------------------------|
-| `↑` `↓`       | Scroll riga per riga    |
-| `PgUp` `PgDn` | Scroll 10 righe         |
-| `Home` `End`   | Inizio / fine lista     |
-| `q`            | Esci                    |
+| Tasto              | Azione                  |
+|--------------------|-------------------------|
+| `↑` `↓`            | Scroll riga per riga    |
+| `u` `d`            | Scroll 10 righe         |
+| `PgUp` `PgDn`      | Scroll 10 righe         |
+| `Home` `End`       | Inizio / fine lista     |
+| `q` o `Ctrl+C`     | Esci                    |
 
 ## Formato CSV
 
