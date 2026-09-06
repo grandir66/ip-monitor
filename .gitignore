@@ -34,3 +34,6 @@ Thumbs.db
 # Claude
 .claude/
 CLAUDE.md
+
+# binario compilato (PyInstaller): si rigenera, non si committa
+ipmon
